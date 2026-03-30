@@ -3,11 +3,3 @@
   padding: 0;
   font-family: 'Segoe UI';
 }
-.table-header {
-  display: flex;
-
-}
-.table-field {
-  padding-inline: 20px;
-  border: 1px solid rgb(163, 163, 163);
-}
