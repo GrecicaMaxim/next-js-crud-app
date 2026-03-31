@@ -27,6 +27,8 @@ import { visuallyHidden } from '@mui/utils';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Divider from '@mui/material/Divider';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -117,6 +119,21 @@ const emptyAddErrors = {
   genre: '',
 };
 
+const emptyEditForm = {
+  title: '',
+  author: '',
+  publicationYear: '',
+  genre: '',
+};
+
+const emptyEditErrors = {
+  title: '',
+  author: '',
+  publicationYear: '',
+  genre: '',
+  general: '',
+};
+
 function validateId(value, existingRows) {
   if (value === '' || value === null || value === undefined) {
     return 'ID-ul este obligatoriu.';
@@ -162,6 +179,36 @@ function validateYear(value) {
 
 function validateGenre(value) {
   if (!value || value.trim() === '') return 'Genul este obligatoriu.';
+  if (value.trim().length > 30) return 'Genul nu poate depăși 30 de caractere.';
+  return '';
+}
+
+function validateEditYear(value) {
+  if (value === '' || value === null || value === undefined) return ''; // gol = nu se modifică
+  const num = Number(value);
+  if (!Number.isInteger(num)) {
+    return 'Anul publicării trebuie să fie un număr întreg.';
+  }
+  if (num < 1500 || num > CURRENT_YEAR) {
+    return `Anul publicării trebuie să fie între 1500 și ${CURRENT_YEAR}.`;
+  }
+  return '';
+}
+
+function validateEditTitle(value) {
+  if (value === '' || value === null) return ''; // gol = nu se modifică
+  if (value.trim().length > 50) return 'Titlul nu poate depăși 50 de caractere.';
+  return '';
+}
+
+function validateEditAuthor(value) {
+  if (value === '' || value === null) return ''; // gol = nu se modifică
+  if (value.trim().length > 50) return 'Autorul nu poate depăși 50 de caractere.';
+  return '';
+}
+
+function validateEditGenre(value) {
+  if (value === '' || value === null) return ''; // gol = nu se modifică
   if (value.trim().length > 30) return 'Genul nu poate depăși 30 de caractere.';
   return '';
 }
@@ -237,7 +284,7 @@ EnhancedTableHead.propTypes = {
 };
 
 function EnhancedTableToolbar(props) {
-  const { numSelected, onAdd } = props;
+  const { numSelected, onAdd, onEdit } = props;
   return (
     <Toolbar
       sx={[
@@ -271,11 +318,25 @@ function EnhancedTableToolbar(props) {
         </Typography>
       )}
       {numSelected > 0 ? (
-        <Tooltip title="Delete">
-          <IconButton>
-            <DeleteIcon />
-          </IconButton>
-        </Tooltip>
+        <>
+          <Tooltip title="Actualizează rândul/rândurile selectate">
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<EditIcon />}
+              onClick={onEdit}
+              size="small"
+            >
+              Actualizează
+            </Button>
+          </Tooltip>
+          <Tooltip title="Delete">
+            <IconButton>
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        </>
+        
       ) : (
         <Tooltip title="Filter list">
           <IconButton>
@@ -299,6 +360,8 @@ function EnhancedTableToolbar(props) {
 
 EnhancedTableToolbar.propTypes = {
   numSelected: PropTypes.number.isRequired,
+  onAdd: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
 };
 
 export default function EnhancedTable() {
@@ -314,6 +377,10 @@ export default function EnhancedTable() {
   const [addDialogOpen, setAddDialogOpen] = React.useState(false);
   const [addForm, setAddForm] = React.useState(emptyAddForm);
   const [addErrors, setAddErrors] = React.useState(emptyAddErrors);
+  const [warnDialogOpen, setWarnDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editForm, setEditForm] = React.useState(emptyEditForm);
+  const [editErrors, setEditErrors] = React.useState(emptyEditErrors);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'success' });
 
   React.useEffect(() => {
@@ -428,12 +495,99 @@ export default function EnhancedTable() {
     showSnackbar('Cartea a fost adăugată cu succes!');
   }
 
+  function handleOpenEditFlow() {
+    if (selected.length > 1) {
+      setWarnDialogOpen(true);
+    } else {
+      openEditDialog();
+    }
+  }
+
+  function handleWarnConfirm() {
+    setWarnDialogOpen(false);
+    openEditDialog();
+  }
+
+  function handleWarnCancel() {
+    setWarnDialogOpen(false);
+  }
+
+  function openEditDialog() {
+    setEditForm(emptyEditForm);
+    setEditErrors(emptyEditErrors);
+    setEditDialogOpen(true);
+  }
+
+  function handleCloseEditDialog() {
+    setEditDialogOpen(false);
+  }
+
+  function handleEditFormChange(e) {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({ ...prev, [name]: value }));
+    setEditErrors((prev) => ({ ...prev, [name]: '', general: '' }));
+  }
+
+  function handleEditSubmit() {
+    const allEmpty =
+      editForm.title.trim() === '' &&
+      editForm.author.trim() === '' &&
+      editForm.publicationYear.trim() === '' &&
+      editForm.genre.trim() === '';
+
+    if (allEmpty) {
+      setEditErrors((prev) => ({
+        ...prev,
+        general: 'Cel puțin un câmp trebuie completat pentru a efectua actualizarea.',
+      }));
+      return;
+    }
+
+    const errors = {
+      title: validateEditTitle(editForm.title),
+      author: validateEditAuthor(editForm.author),
+      publicationYear: validateEditYear(editForm.publicationYear),
+      genre: validateEditGenre(editForm.genre),
+      general: '',
+    };
+
+    setEditErrors(errors);
+
+    const hasFieldError = ['title', 'author', 'publicationYear', 'genre'].some(
+      (key) => errors[key] !== ''
+    );
+    if (hasFieldError) return;
+
+    const updatedRows = rows.map((row) => {
+      if (!selected.includes(row.id)) return row;
+
+      return {
+        ...row,
+        title: editForm.title.trim() !== '' ? editForm.title.trim() : row.title,
+        author: editForm.author.trim() !== '' ? editForm.author.trim() : row.author,
+        publicationYear: editForm.publicationYear.trim() !== '' ? Number(editForm.publicationYear) : row.publicationYear,
+        genre: editForm.genre.trim() !== '' ? editForm.genre.trim() : row.genre,
+      };
+    });
+
+    setRows(updatedRows);
+    saveRowsToStorage(updatedRows);
+    setEditDialogOpen(false);
+    setSelected([]);
+    showSnackbar(
+      selected.length === 1
+        ? 'Cartea a fost actualizată cu succes!'
+        : `${selected.length} cărți au fost actualizate cu succes!`
+    );
+  }
+
   return (
     <Box sx={{ width: '100%' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
         <EnhancedTableToolbar
           numSelected={selected.length}
           onAdd={handleOpenAddDialog}
+          onEdit={handleOpenEditFlow}
         />
         <Divider />
         <TableContainer>
@@ -473,6 +627,8 @@ export default function EnhancedTable() {
                         inputProps={{
                           'aria-labelledby': labelId,
                         }}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => handleClick(event, row.id)}
                       />
                     </TableCell>
                     <TableCell
@@ -512,6 +668,7 @@ export default function EnhancedTable() {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Paper>
+
       <Dialog open={addDialogOpen} onClose={handleCloseAddDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Adaugă o carte nouă</DialogTitle>
         <DialogContent>
@@ -584,6 +741,97 @@ export default function EnhancedTable() {
         <DialogActions>
           <Button onClick={handleCloseAddDialog} color="inherit">Anulează</Button>
           <Button onClick={handleAddSubmit} variant="contained">Adaugă</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={warnDialogOpen} onClose={handleWarnCancel} maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberIcon color="warning" />
+          Atenție: editare multiplă
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Ai selectat <strong>{selected.length} rânduri</strong>. Câmpurile completate în
+            formularul următor vor fi aplicate <strong>tuturor rândurilor selectate</strong> cu
+            valori identice. Ești sigur că dorești să continui?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleWarnCancel} color="inherit">Anulează</Button>
+          <Button onClick={handleWarnConfirm} variant="contained" color="warning">
+            Da, continuă
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Actualizează {selected.length === 1 ? 'cartea selectată' : `cele ${selected.length} cărți selectate`}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Completează doar câmpurile pe care dorești să le modifici. Câmpurile lăsate goale
+            nu vor fi modificate.
+          </DialogContentText>
+
+          {editErrors.general && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {editErrors.general}
+            </Alert>
+          )}
+
+          <Stack spacing={2}>
+
+            <TextField
+              label="Titlu"
+              name="title"
+              value={editForm.title}
+              onChange={handleEditFormChange}
+              error={!!editErrors.title}
+              helperText={editErrors.title || 'Lăsați gol pentru a nu modifica (maxim 50 caractere)'}
+              fullWidth
+              inputProps={{ maxLength: 50 }}
+            />
+
+            <TextField
+              label="Autor"
+              name="author"
+              value={editForm.author}
+              onChange={handleEditFormChange}
+              error={!!editErrors.author}
+              helperText={editErrors.author || 'Lăsați gol pentru a nu modifica (maxim 50 caractere)'}
+              fullWidth
+              inputProps={{ maxLength: 50 }}
+            />
+
+            <TextField
+              label="Anul publicării"
+              name="publicationYear"
+              value={editForm.publicationYear}
+              onChange={handleEditFormChange}
+              type="number"
+              error={!!editErrors.publicationYear}
+              helperText={editErrors.publicationYear || `Lăsați gol pentru a nu modifica (1500–${CURRENT_YEAR})`}
+              fullWidth
+              inputProps={{ min: 1500, max: CURRENT_YEAR }}
+            />
+
+            <TextField
+              label="Gen"
+              name="genre"
+              value={editForm.genre}
+              onChange={handleEditFormChange}
+              error={!!editErrors.genre}
+              helperText={editErrors.genre || 'Lăsați gol pentru a nu modifica (maxim 30 caractere)'}
+              fullWidth
+              inputProps={{ maxLength: 30 }}
+            />
+
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog} color="inherit">Anulează</Button>
+          <Button onClick={handleEditSubmit} variant="contained">Salvează</Button>
         </DialogActions>
       </Dialog>
       <Snackbar
