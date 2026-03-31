@@ -18,16 +18,31 @@ import Paper from '@mui/material/Paper';
 import Checkbox from '@mui/material/Checkbox';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import TextField from '@mui/material/TextField';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import { visuallyHidden } from '@mui/utils';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import AddIcon from '@mui/icons-material/Add';
+import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
 
-function createData(id, book_id, title, author, publicationYear, genre) {
+
+const CURRENT_YEAR = new Date().getFullYear();
+const LOCAL_STORAGE_KEY = 'carti_biblioteca';
+
+function createData(id, title, author, publicationYear, genre) {
   return {
     id,
-    book_id,
     title,
     author,
     publicationYear,
@@ -35,21 +50,7 @@ function createData(id, book_id, title, author, publicationYear, genre) {
   };
 }
 
-const rows = [
-  createData(1, 'Cupcake', 305, 3.7, 67, 4.3),
-  createData(2, 'Donut', 452, 25.0, 51, 4.9),
-  createData(3, 'Eclair', 262, 16.0, 24, 6.0),
-  createData(4, 'Frozen yoghurt', 159, 6.0, 24, 4.0),
-  createData(5, 'Gingerbread', 356, 16.0, 49, 3.9),
-  createData(6, 'Honeycomb', 408, 3.2, 87, 6.5),
-  createData(7, 'Ice cream sandwich', 237, 9.0, 37, 4.3),
-  createData(8, 'Jelly Bean', 375, 0.0, 94, 0.0),
-  createData(9, 'KitKat', 518, 26.0, 65, 7.0),
-  createData(10, 'Lollipop', 392, 0.2, 98, 0.0),
-  createData(11, 'Marshmallow', 318, 0, 81, 2.0),
-  createData(12, 'Nougat', 360, 19.0, 9, 37.0),
-  createData(13, 'Oreo', 437, 18.0, 63, 4.0),
-];
+const rows = [];
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {
@@ -69,7 +70,7 @@ function getComparator(order, orderBy) {
 
 const headCells = [
   {
-    id: 'book_id',
+    id: 'id',
     numeric: false,
     disablePadding: true,
     label: 'ID_Carte',
@@ -99,6 +100,85 @@ const headCells = [
     label: 'Genul',
   },
 ];
+
+const emptyAddForm = {
+  id: '',
+  title: '',
+  author: '',
+  publicationYear: '',
+  genre: '',
+};
+
+const emptyAddErrors = {
+  id: '',
+  title: '',
+  author: '',
+  publicationYear: '',
+  genre: '',
+};
+
+function validateId(value, existingRows) {
+  if (value === '' || value === null || value === undefined) {
+    return 'ID-ul este obligatoriu.';
+  }
+  const num = Number(value);
+  if (!Number.isInteger(num)) {
+    return 'ID-ul trebuie să fie un număr întreg.';
+  }
+  if (num < 1 || num > 1000000) {
+    return 'ID-ul trebuie să fie între 1 și 1.000.000.';
+  }
+  if (existingRows.some((row) => row.id === num)) {
+    return 'Un rând cu acest ID există deja în tabel.';
+  }
+  return '';
+}
+
+function validateTitle(value) {
+  if (!value || value.trim() === '') return 'Titlul este obligatoriu.';
+  if (value.trim().length > 50) return 'Titlul nu poate depăși 50 de caractere.';
+  return '';
+}
+
+function validateAuthor(value) {
+  if (!value || value.trim() === '') return 'Autorul este obligatoriu.';
+  if (value.trim().length > 50) return 'Autorul nu poate depăși 50 de caractere.';
+  return '';
+}
+
+function validateYear(value) {
+  if (value === '' || value === null || value === undefined) {
+    return 'Anul publicării este obligatoriu.';
+  }
+  const num = Number(value);
+  if (!Number.isInteger(num)) {
+    return 'Anul publicării trebuie să fie un număr întreg.';
+  }
+  if (num < 1500 || num > CURRENT_YEAR) {
+    return `Anul publicării trebuie să fie între 1500 și ${CURRENT_YEAR}.`;
+  }
+  return '';
+}
+
+function validateGenre(value) {
+  if (!value || value.trim() === '') return 'Genul este obligatoriu.';
+  if (value.trim().length > 30) return 'Genul nu poate depăși 30 de caractere.';
+  return '';
+}
+
+function loadRowsFromStorage() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveRowsToStorage(rows) {
+  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(rows));
+}
 
 function EnhancedTableHead(props) {
   const { onSelectAllClick, order, orderBy, numSelected, rowCount, onRequestSort } =
@@ -157,7 +237,7 @@ EnhancedTableHead.propTypes = {
 };
 
 function EnhancedTableToolbar(props) {
-  const { numSelected } = props;
+  const { numSelected, onAdd } = props;
   return (
     <Toolbar
       sx={[
@@ -187,7 +267,7 @@ function EnhancedTableToolbar(props) {
           id="tableTitle"
           component="div"
         >
-          Nutrition
+          Aplicatie despre carti
         </Typography>
       )}
       {numSelected > 0 ? (
@@ -203,6 +283,16 @@ function EnhancedTableToolbar(props) {
           </IconButton>
         </Tooltip>
       )}
+      <Tooltip title="Adaugă o carte nouă">
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={onAdd}
+          size="small"
+        >
+          Adaugă
+        </Button>
+      </Tooltip>
     </Toolbar>
   );
 }
@@ -212,11 +302,32 @@ EnhancedTableToolbar.propTypes = {
 };
 
 export default function EnhancedTable() {
+  const [rows, setRows] = React.useState(() => {
+    if (typeof window === 'undefined') return []; // pe server nu există localStorage
+    return loadRowsFromStorage();
+  });
   const [order, setOrder] = React.useState('asc');
   const [orderBy, setOrderBy] = React.useState('calories');
   const [selected, setSelected] = React.useState([]);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [addDialogOpen, setAddDialogOpen] = React.useState(false);
+  const [addForm, setAddForm] = React.useState(emptyAddForm);
+  const [addErrors, setAddErrors] = React.useState(emptyAddErrors);
+  const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'success' });
+
+  React.useEffect(() => {
+    const stored = loadRowsFromStorage();
+    setRows(stored);
+  }, []);
+
+  function showSnackbar(message, severity = 'success') {
+    setSnackbar({ open: true, message, severity });
+  }
+
+  function handleSnackbarClose() {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  }
 
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === 'asc';
@@ -273,10 +384,58 @@ export default function EnhancedTable() {
     [order, orderBy, page, rowsPerPage],
   );
 
+  function handleOpenAddDialog() {
+    setAddForm(emptyAddForm);
+    setAddErrors(emptyAddErrors);
+    setAddDialogOpen(true);
+  }
+
+  function handleCloseAddDialog() {
+    setAddDialogOpen(false);
+  }
+
+  function handleAddFormChange(e) {
+    const { name, value } = e.target;
+    setAddForm((prev) => ({ ...prev, [name]: value }));
+    setAddErrors((prev) => ({ ...prev, [name]: '' }));
+  }
+
+  function handleAddSubmit() {
+    const errors = {
+      id:              validateId(addForm.id, rows),
+      title:           validateTitle(addForm.title),
+      author:          validateAuthor(addForm.author),
+      publicationYear: validateYear(addForm.publicationYear),
+      genre:           validateGenre(addForm.genre),
+    };
+
+    setAddErrors(errors);
+
+    if (Object.values(errors).some((e) => e !== '')) return;
+
+    const newRow = {
+      id:              Number(addForm.id),
+      title:           addForm.title.trim(),
+      author:          addForm.author.trim(),
+      publicationYear: Number(addForm.publicationYear),
+      genre:           addForm.genre.trim(),
+    };
+
+    const updatedRows = [...rows, newRow];
+    setRows(updatedRows);
+    saveRowsToStorage(updatedRows);
+    setAddDialogOpen(false);
+    showSnackbar('Cartea a fost adăugată cu succes!');
+  }
+
   return (
     <Box sx={{ width: '100%' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
-        <EnhancedTableToolbar numSelected={selected.length} />
+        <EnhancedTableToolbar
+          numSelected={selected.length}
+          onAdd={handleOpenAddDialog}
+        />
+        <Divider />
         <TableContainer>
           <Table
             sx={{ minWidth: 750 }}
@@ -292,7 +451,7 @@ export default function EnhancedTable() {
               rowCount={rows.length}
             />
             <TableBody>
-              {visibleRows.map((row, index) => {
+              ({visibleRows.map((row, index) => {
                 const isItemSelected = selected.includes(row.id);
                 const labelId = `enhanced-table-checkbox-${index}`;
 
@@ -322,15 +481,15 @@ export default function EnhancedTable() {
                       scope="row"
                       padding="none"
                     >
-                      {row.book_id}
+                      {row.id}
                     </TableCell>
-                    <TableCell align="right">{row.title}</TableCell>
-                    <TableCell align="right">{row.author}</TableCell>
+                    <TableCell>{row.title}</TableCell>
+                    <TableCell>{row.author}</TableCell>
                     <TableCell align="right">{row.publicationYear}</TableCell>
-                    <TableCell align="right">{row.genre}</TableCell>
+                    <TableCell>{row.genre}</TableCell>
                   </TableRow>
                 );
-              })}
+              })})
               {emptyRows > 0 && (
                 <TableRow
                   style={{
@@ -353,6 +512,90 @@ export default function EnhancedTable() {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Paper>
+      <Dialog open={addDialogOpen} onClose={handleCloseAddDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Adaugă o carte nouă</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+
+            <TextField
+              label="ID Carte"
+              name="id"
+              value={addForm.id}
+              onChange={handleAddFormChange}
+              type="number"
+              error={!!addErrors.id}
+              helperText={addErrors.id || 'Număr întreg între 1 și 1.000.000'}
+              fullWidth
+              required
+              inputProps={{ min: 1, max: 1000000 }}
+            />
+
+            <TextField
+              label="Titlu"
+              name="title"
+              value={addForm.title}
+              onChange={handleAddFormChange}
+              error={!!addErrors.title}
+              helperText={addErrors.title || 'Maxim 50 de caractere'}
+              fullWidth
+              required
+              inputProps={{ maxLength: 50 }}
+            />
+
+            <TextField
+              label="Autor"
+              name="author"
+              value={addForm.author}
+              onChange={handleAddFormChange}
+              error={!!addErrors.author}
+              helperText={addErrors.author || 'Maxim 50 de caractere'}
+              fullWidth
+              required
+              inputProps={{ maxLength: 50 }}
+            />
+
+            <TextField
+              label="Anul publicării"
+              name="publicationYear"
+              value={addForm.publicationYear}
+              onChange={handleAddFormChange}
+              type="number"
+              error={!!addErrors.publicationYear}
+              helperText={addErrors.publicationYear || `Număr întreg între 1500 și ${CURRENT_YEAR}`}
+              fullWidth
+              required
+              inputProps={{ min: 1500, max: CURRENT_YEAR }}
+            />
+
+            <TextField
+              label="Gen"
+              name="genre"
+              value={addForm.genre}
+              onChange={handleAddFormChange}
+              error={!!addErrors.genre}
+              helperText={addErrors.genre || 'Maxim 30 de caractere'}
+              fullWidth
+              required
+              inputProps={{ maxLength: 30 }}
+            />
+
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddDialog} color="inherit">Anulează</Button>
+          <Button onClick={handleAddSubmit} variant="contained">Adaugă</Button>
+        </DialogActions>
+      </Dialog>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3500}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
