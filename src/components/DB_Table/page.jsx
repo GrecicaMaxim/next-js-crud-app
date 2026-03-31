@@ -37,7 +37,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
-
+import Chip from '@mui/material/Chip';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const LOCAL_STORAGE_KEY = 'carti_biblioteca';
@@ -79,25 +79,25 @@ const headCells = [
   },
   {
     id: 'title',
-    numeric: true,
+    numeric: false,
     disablePadding: false,
     label: 'Titlu',
   },
   {
     id: 'author',
-    numeric: true,
+    numeric: false,
     disablePadding: false,
     label: 'Autor',
   },
   {
     id: 'publicationYear',
-    numeric: true,
+    numeric: false,
     disablePadding: false,
     label: 'Anul_publicarii',
   },
   {
     id: 'genre',
-    numeric: true,
+    numeric: false,
     disablePadding: false,
     label: 'Genul',
   },
@@ -284,7 +284,7 @@ EnhancedTableHead.propTypes = {
 };
 
 function EnhancedTableToolbar(props) {
-  const { numSelected, onAdd, onEdit } = props;
+  const { numSelected, onAdd, onEdit, onDelete } = props;
   return (
     <Toolbar
       sx={[
@@ -330,10 +330,16 @@ function EnhancedTableToolbar(props) {
               Actualizează
             </Button>
           </Tooltip>
-          <Tooltip title="Delete">
-            <IconButton>
-              <DeleteIcon />
-            </IconButton>
+          <Tooltip title="Șterge rândul/rândurile selectate">
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={onDelete}
+              size="small"
+            >
+              Șterge
+            </Button>
           </Tooltip>
         </>
         
@@ -362,6 +368,7 @@ EnhancedTableToolbar.propTypes = {
   numSelected: PropTypes.number.isRequired,
   onAdd: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
 };
 
 export default function EnhancedTable() {
@@ -381,6 +388,7 @@ export default function EnhancedTable() {
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [editForm, setEditForm] = React.useState(emptyEditForm);
   const [editErrors, setEditErrors] = React.useState(emptyEditErrors);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [snackbar, setSnackbar] = React.useState({ open: false, message: '', severity: 'success' });
 
   React.useEffect(() => {
@@ -581,6 +589,28 @@ export default function EnhancedTable() {
     );
   }
 
+  function handleOpenDeleteDialog() {
+    setDeleteDialogOpen(true);
+  }
+
+  function handleCloseDeleteDialog() {
+    setDeleteDialogOpen(false);
+  }
+
+  function handleDeleteConfirm() {
+    const updatedRows = rows.filter((row) => !selected.includes(row.id));
+    setRows(updatedRows);
+    saveRowsToStorage(updatedRows);
+    setSelected([]);
+    setDeleteDialogOpen(false);
+    showSnackbar(
+      selected.length === 1
+        ? 'Cartea a fost ștearsă cu succes!'
+        : `${selected.length} cărți au fost șterse cu succes!`,
+      'info'
+    );
+  }
+
   return (
     <Box sx={{ width: '100%' }}>
       <Paper sx={{ width: '100%', mb: 2 }}>
@@ -588,6 +618,7 @@ export default function EnhancedTable() {
           numSelected={selected.length}
           onAdd={handleOpenAddDialog}
           onEdit={handleOpenEditFlow}
+          onDelete={handleOpenDeleteDialog}
         />
         <Divider />
         <TableContainer>
@@ -641,8 +672,10 @@ export default function EnhancedTable() {
                     </TableCell>
                     <TableCell>{row.title}</TableCell>
                     <TableCell>{row.author}</TableCell>
-                    <TableCell align="right">{row.publicationYear}</TableCell>
-                    <TableCell>{row.genre}</TableCell>
+                    <TableCell>{row.publicationYear}</TableCell>
+                    <TableCell>
+                      <Chip label={row.genre} size="small" color="primary" variant="outlined" />
+                    </TableCell>
                   </TableRow>
                 );
               })})
@@ -832,6 +865,29 @@ export default function EnhancedTable() {
         <DialogActions>
           <Button onClick={handleCloseEditDialog} color="inherit">Anulează</Button>
           <Button onClick={handleEditSubmit} variant="contained">Salvează</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="sm">
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DeleteIcon color="error" />
+          Confirmare ștergere
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Ești sigur că dorești să ștergi{' '}
+            <strong>
+              {selected.length === 1
+                ? '1 carte'
+                : `${selected.length} cărți`}
+            </strong>
+            ? Această acțiune este ireversibilă.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="inherit">Anulează</Button>
+          <Button onClick={handleDeleteConfirm} variant="contained" color="error">
+            Da, șterge
+          </Button>
         </DialogActions>
       </Dialog>
       <Snackbar
